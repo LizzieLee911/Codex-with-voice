@@ -1,3 +1,7 @@
+# Just hand this repo to Codex and it will handle everything for you. 
+
+I actually don't think a readme is needed. The Desktop app should be straight forward enough
+
 # Codex with Voice
 
 Minimal desktop voice control for Codex CLI.
