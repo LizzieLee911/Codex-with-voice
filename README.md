@@ -2,6 +2,8 @@
 
 I actually don't think a readme is needed. The Desktop app should be straight forward enough
 
+![Codex Voice Companion desktop app](assets/codex-voice-companion.png)
+
 # Codex with Voice
 
 Minimal desktop voice control for Codex CLI.
