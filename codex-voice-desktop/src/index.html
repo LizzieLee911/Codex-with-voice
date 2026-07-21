@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex Voice Companion</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Codex Voice</h1>
+          <p>Say “codex” to send a request.</p>
+        </div>
+        <span id="status" data-mode="stopped">Stopped</span>
+      </header>
+
+      <section class="control">
+        <div class="buttons">
+          <button id="start">Start</button>
+          <button id="stop">Stop</button>
+        </div>
+
+        <div class="facts">
+          <div>
+            <span>Language</span>
+            <strong id="language">Waiting</strong>
+          </div>
+          <div>
+            <span>WhisperLiveKit</span>
+            <strong id="wlk">checking</strong>
+          </div>
+          <div>
+            <span>Codex CLI</span>
+            <strong id="codex">checking</strong>
+          </div>
+        </div>
+
+        <label class="sandboxControl">
+          <span>Permission</span>
+          <input id="sandbox" type="range" min="0" max="2" step="1" value="2">
+          <strong id="sandboxLabel">Full access</strong>
+        </label>
+      </section>
+
+      <section class="logPanel">
+        <h2>Live Log</h2>
+        <pre id="log" class="log"></pre>
+      </section>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,14 @@
+node_modules/
+.venv/
+.voice/
+.desktop-test/
+WhisperLiveKit/
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.pid
+dist/
+out/
+.DS_Store
+Thumbs.db
