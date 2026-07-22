@@ -63,6 +63,12 @@ By default the bridge tries `codex exec resume --last`. If that local resume tar
 .venv\Scripts\python.exe voice_bridge.py --submit-codex --no-codex-fallback-new-session
 ```
 
+To skip `resume --last` and start a fresh Codex session for every captured voice request:
+
+```cmd
+.venv\Scripts\python.exe voice_bridge.py --submit-codex --speak --codex-new-session
+```
+
 ## Behavior
 
 - Wake words: `codex`, `code x`, `code ex`, `kodex`
@@ -78,6 +84,7 @@ By default the bridge tries `codex exec resume --last`. If that local resume tar
 - It finalizes after no audio/text activity as a fallback, but never faster than the current dynamic human-silence wait.
 - It writes files under `.voice\turns`.
 - `--submit-codex` is required before anything is sent to Codex CLI.
+- Default Codex session behavior is `resume --last`; `--codex-new-session` starts each voice request in a fresh Codex session.
 - Submitted Codex requests append an English output-style instruction: default to English, no code, file paths, Markdown links, or logs; report progress and results in plain English.
 - Codex sandbox defaults to `danger-full-access`. Override it with `--codex-sandbox read-only`, `--codex-sandbox workspace-write`, or `--codex-sandbox danger-full-access`.
 - `--speak` uses Windows local TTS. When a prompt is submitted, it immediately says `Sure, request received. Please hold on.` before Codex finishes; override with `--ack-text`.

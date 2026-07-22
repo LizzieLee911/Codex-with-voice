@@ -13,6 +13,8 @@ const els = {
   codex: $("codex"),
   sandbox: $("sandbox"),
   sandboxLabel: $("sandboxLabel"),
+  newSession: $("newSession"),
+  sessionLabel: $("sessionLabel"),
   log: $("log"),
   start: $("start"),
   stop: $("stop")
@@ -37,9 +39,12 @@ function renderState(state) {
   els.wlk.textContent = state.wlk || "unknown";
   els.sandbox.value = String(sandboxIndex);
   els.sandboxLabel.textContent = sandboxModes[sandboxIndex].label;
+  els.newSession.checked = Boolean(state.newSession);
+  els.sessionLabel.textContent = state.newSession ? "New session for each request" : "Resume last session";
   els.start.disabled = mode !== "stopped";
   els.stop.disabled = mode === "stopped";
   els.sandbox.disabled = mode !== "stopped";
+  els.newSession.disabled = mode !== "stopped";
 }
 
 async function refreshEnv() {
@@ -64,6 +69,11 @@ els.sandbox.addEventListener("input", () => {
   const mode = currentSandboxMode();
   els.sandboxLabel.textContent = sandboxModes[Number(els.sandbox.value)].label;
   runAction(`Sandbox: ${mode}`, () => window.voiceApp.setSandbox(mode));
+});
+els.newSession.addEventListener("change", () => {
+  const enabled = els.newSession.checked;
+  els.sessionLabel.textContent = enabled ? "New session for each request" : "Resume last session";
+  runAction(`Session mode: ${enabled ? "new" : "resume last"}`, () => window.voiceApp.setNewSession(enabled));
 });
 
 window.voiceApp.onLog(appendLog);

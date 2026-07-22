@@ -21,6 +21,7 @@ The current build is a Windows-first prototype. macOS and Linux should be possib
 - Speaks a quick acknowledgement before Codex starts working.
 - Speaks the final Codex answer with local Windows TTS.
 - Can keep listening while the window is hidden to the system tray.
+- Defaults to resuming the latest Codex session, with an optional `New session` checkbox for fresh sessions.
 - Exposes a permission slider for Codex sandbox mode:
   - `read-only`
   - `workspace-write`
@@ -101,10 +102,11 @@ npm start
 
 1. Open the app with `npm start`.
 2. Pick the Codex permission mode before starting.
-3. Click `Start`.
-4. Say `codex`, then speak your request.
-5. Wait for the spoken acknowledgement: `Sure, request received. Please hold on.`
-6. Codex runs in the background and speaks the result.
+3. Leave `New session` unchecked to resume the latest Codex session, or check it to start a fresh Codex session for each voice request.
+4. Click `Start`.
+5. Say `codex`, then speak your request.
+6. Wait for the spoken acknowledgement: `Sure, request received. Please hold on.`
+7. Codex runs in the background and speaks the result.
 
 Window behavior:
 
@@ -153,6 +155,24 @@ The Python bridge exposes the same setting:
 
 ```cmd
 .venv\Scripts\python.exe voice_bridge.py --submit-codex --speak --codex-sandbox workspace-write
+```
+
+## Codex Session Modes
+
+By default, the bridge runs:
+
+```text
+codex exec resume --last
+```
+
+This keeps the current quick workflow: voice requests continue the most recent local Codex session, and if that resume fails the bridge falls back to a fresh `codex exec`.
+
+If you check `New session` in the desktop app, each captured voice request skips `resume --last` and starts a fresh Codex session instead.
+
+The Python bridge exposes the same option:
+
+```cmd
+.venv\Scripts\python.exe voice_bridge.py --submit-codex --speak --codex-new-session
 ```
 
 ## Current Limitations

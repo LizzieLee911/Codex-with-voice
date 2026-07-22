@@ -21,7 +21,8 @@ let state = {
   workspace: paths.workspaceRoot,
   voiceRoot: paths.voiceRoot,
   detectedLanguage: "Waiting",
-  sandboxMode: "danger-full-access"
+  sandboxMode: "danger-full-access",
+  newSession: false
 };
 
 function send(channel, payload) {
@@ -238,8 +239,11 @@ async function startVoice() {
     "--submit-codex",
     "--speak"
   ];
+  if (state.newSession) {
+    args.push("--codex-new-session");
+  }
 
-  log(`Starting listener with sandbox: ${state.sandboxMode}`);
+  log(`Starting listener with sandbox: ${state.sandboxMode}; session: ${state.newSession ? "new" : "resume last"}`);
   voiceProcess = spawn(paths.pythonBin, args, {
     cwd: paths.voiceRoot,
     windowsHide: true
@@ -308,6 +312,10 @@ ipcMain.handle("set-sandbox", (_event, sandboxMode) => {
     throw new Error(`Unsupported sandbox mode: ${sandboxMode}`);
   }
   setState({ sandboxMode });
+  return state;
+});
+ipcMain.handle("set-new-session", (_event, newSession) => {
+  setState({ newSession: Boolean(newSession) });
   return state;
 });
 

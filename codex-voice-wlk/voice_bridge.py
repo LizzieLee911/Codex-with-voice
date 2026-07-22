@@ -350,13 +350,19 @@ def run_codex(
     codex_bin: str | None,
     fallback_new_session: bool,
     sandbox_mode: str,
+    new_session: bool,
 ) -> str:
     resolved_bin = resolve_codex_bin(codex_bin)
     codex_prompt = build_codex_prompt(prompt)
-    attempts: list[tuple[str, list[str]]] = [
-        ("resume", build_codex_cmd(resolved_bin, answer_path, session_id, resume=True, sandbox_mode=sandbox_mode))
-    ]
-    if fallback_new_session and not session_id:
+    if new_session:
+        attempts: list[tuple[str, list[str]]] = [
+            ("new-session", build_codex_cmd(resolved_bin, answer_path, None, resume=False, sandbox_mode=sandbox_mode))
+        ]
+    else:
+        attempts = [
+            ("resume", build_codex_cmd(resolved_bin, answer_path, session_id, resume=True, sandbox_mode=sandbox_mode))
+        ]
+    if not new_session and fallback_new_session and not session_id:
         attempts.append(
             ("new-session", build_codex_cmd(resolved_bin, answer_path, None, resume=False, sandbox_mode=sandbox_mode))
         )
@@ -465,7 +471,8 @@ async def main_async(args: argparse.Namespace) -> None:
             print("Preview mode. Add --submit-codex to send this to Codex CLI.")
             continue
 
-        print("Submitting to Codex CLI...")
+        session_mode = "new session" if args.codex_new_session else "resume last"
+        print(f"Submitting to Codex CLI ({session_mode})...")
         ack_process = speak_windows_async(args.ack_text, args.tts_rate) if args.speak else None
         try:
             answer = run_codex(
@@ -477,6 +484,7 @@ async def main_async(args: argparse.Namespace) -> None:
                 args.codex_bin,
                 args.codex_fallback_new_session,
                 args.codex_sandbox,
+                args.codex_new_session,
             )
         except RuntimeError as exc:
             print(exc)
@@ -517,6 +525,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-session-id")
     parser.add_argument("--codex-bin")
     parser.add_argument("--codex-fallback-new-session", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--codex-new-session", action="store_true")
     parser.add_argument("--codex-sandbox", choices=CODEX_SANDBOX_MODES, default="danger-full-access")
     parser.add_argument("--submit-codex", action="store_true")
     parser.add_argument("--speak", action="store_true")

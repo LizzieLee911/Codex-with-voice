@@ -130,7 +130,8 @@ input:disabled {
 }
 
 .facts span,
-.sandboxControl span {
+.sandboxControl span,
+.sessionControl span {
   display: block;
   color: var(--muted);
   font-size: 12px;
@@ -138,7 +139,8 @@ input:disabled {
 }
 
 .facts strong,
-.sandboxControl strong {
+.sandboxControl strong,
+.sessionControl strong {
   display: block;
   font-size: 13px;
   font-weight: 650;
@@ -155,6 +157,24 @@ input:disabled {
 
 .sandboxControl span {
   margin: 0;
+}
+
+.sessionControl {
+  display: grid;
+  grid-template-columns: 20px 90px minmax(180px, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.sessionControl span {
+  margin: 0;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
 }
 
 input[type="range"] {
@@ -194,7 +214,8 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .sandboxControl {
+  .sandboxControl,
+  .sessionControl {
     grid-template-columns: 1fr;
   }
 }
