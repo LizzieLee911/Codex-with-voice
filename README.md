@@ -18,6 +18,7 @@ Codex is powerful, but it is still mostly keyboard-first. This project adds a li
 - Tray mode: hide the window while the listener keeps running.
 - Permission slider: `read-only`, `workspace-write`, or `danger-full-access`.
 - Session mode: resume the last Codex session by default, or start a new session for each voice request.
+- Multilingual output: uses the detected request language when choosing a local system voice, then falls back to English.
 
 ## Quick Start
 
@@ -72,5 +73,5 @@ Minimize or close the window to hide it to the tray. Use the tray menu to show, 
 
 - This is a Windows-first prototype.
 - Local speech-to-text starts before wake-word detection, so idle resource use is not minimal yet.
-- Voice output uses installed system voices, so quality and language support depend on the machine.
+- Voice output uses installed system voices, so quality and language support depend on the machine. If no matching voice is installed, it falls back to English.
 - The default speech-to-text model is `large-v3-turbo`; use a smaller WhisperLiveKit model on memory-constrained machines.

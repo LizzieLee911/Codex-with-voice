@@ -72,7 +72,7 @@ async function main() {
   assert(fs.existsSync(paths.voiceRoot), "voice root is missing");
   assert(fs.existsSync(paths.pythonBin), "voice venv Python is missing");
   assert(fs.existsSync(path.join(paths.voiceRoot, "voice_bridge.py")), "voice_bridge.py is missing");
-  assert(buildCodexPrompt("hello").includes("Default to English"), "Codex prompt should default to English");
+  assert(buildCodexPrompt("hello").includes("Use the same language"), "Codex prompt should preserve request language");
 
   const version = await codexVersion();
   console.log("codex:", version.bin, version.version || version.error);

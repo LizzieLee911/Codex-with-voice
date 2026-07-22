@@ -18,15 +18,29 @@ from whisperlivekit.silero_vad_iterator import FixedVADIterator, OnnxWrapper, lo
 
 DEFAULT_WS_URL = "ws://127.0.0.1:8000/asr?language=auto&mode=full"
 CODEX_OUTPUT_INSTRUCTION = (
-    "Default to English for both interpreting the request and reporting back. "
+    "Use the same language as the user's request for both interpreting the request and reporting back. "
     "Do not output code, file paths, Markdown links, or logs. "
-    "Use plain English to briefly report progress and the result."
+    "Use plain language to briefly report progress and the result."
 )
 CODEX_SANDBOX_MODES = ("read-only", "workspace-write", "danger-full-access")
 ACK_TEXT = "Sure, request received. Please hold on."
 SEND_NOW_PHRASES = ("发吧", "就这样", "就这些", "可以了", "send now", "that's it", "go ahead")
 HOLD_PHRASES = ("等一下", "我想一下", "让我想想", "hold on", "wait a second", "let me think")
 CONTINUATION_TAILS = ("嗯", "呃", "额", "em", "emm", "emmm", "um", "uh", "然后", "就是")
+LANGUAGE_ALIASES = {
+    "chinese": "zh",
+    "mandarin": "zh",
+    "english": "en",
+    "japanese": "ja",
+    "korean": "ko",
+    "french": "fr",
+    "german": "de",
+    "spanish": "es",
+    "italian": "it",
+    "portuguese": "pt",
+    "russian": "ru",
+    "arabic": "ar",
+}
 
 
 def now_stamp() -> str:
@@ -87,6 +101,29 @@ def human_silence_needed(prompt: str, args: argparse.Namespace) -> float:
     return args.human_silence_seconds
 
 
+def normalize_tts_language(language: str | None) -> str:
+    if not language:
+        return ""
+    cleaned = language.strip().lower().replace("_", "-")
+    cleaned = LANGUAGE_ALIASES.get(cleaned, cleaned)
+    match = re.match(r"^[a-z]{2,3}(?:-[a-z0-9]+)?", cleaned)
+    return match.group(0) if match else ""
+
+
+def infer_language_from_text(text: str) -> str:
+    if re.search(r"[\u4e00-\u9fff]", text):
+        return "zh"
+    if re.search(r"[\u3040-\u30ff]", text):
+        return "ja"
+    if re.search(r"[\uac00-\ud7af]", text):
+        return "ko"
+    if re.search(r"[\u0400-\u04ff]", text):
+        return "ru"
+    if re.search(r"[\u0600-\u06ff]", text):
+        return "ar"
+    return ""
+
+
 def extract_visible_text(message: dict) -> str:
     parts: list[str] = []
     for line in message.get("lines") or []:
@@ -127,7 +164,7 @@ def pcm16_to_float32(data: bytes) -> np.ndarray:
     return np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0
 
 
-async def capture_one_turn(args: argparse.Namespace) -> str:
+async def capture_one_turn(args: argparse.Namespace) -> tuple[str, str]:
     wake_re = compile_wake_regex(args.wake_word)
     audio_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=20)
     loop = asyncio.get_running_loop()
@@ -149,6 +186,7 @@ async def capture_one_turn(args: argparse.Namespace) -> str:
     wake_at = 0.0
     finalizing = False
     reported_language = ""
+    turn_language = ""
 
     def enqueue_audio(data: bytes) -> None:
         with contextlib.suppress(asyncio.QueueFull):
@@ -238,6 +276,8 @@ async def capture_one_turn(args: argparse.Namespace) -> str:
                             prompt_candidate = next_prompt
                             if prompt_candidate and args.debug_transcript:
                                 print("Prompt:", prompt_candidate)
+                        if active and detected_language:
+                            turn_language = detected_language
 
                 if active:
                     prompt_ready = len(prompt_candidate) >= args.min_prompt_chars
@@ -289,10 +329,14 @@ async def capture_one_turn(args: argparse.Namespace) -> str:
                             active,
                             prompt_candidate,
                         )
+                    if active and detected_language:
+                        turn_language = detected_language
             except Exception:
                 pass
 
-    return normalize_space(prompt_candidate)
+    prompt = normalize_space(prompt_candidate)
+    language = infer_language_from_text(prompt) or normalize_tts_language(turn_language or reported_language)
+    return prompt, language
 
 
 def write_turn_files(out_dir: Path, prompt: str) -> tuple[Path, Path, Path]:
@@ -401,13 +445,23 @@ def run_codex(
     return ""
 
 
-def tts_script(rate: int) -> str:
+def ps_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def tts_script(rate: int, language: str | None = None) -> str:
+    preferred_culture = ps_quote(normalize_tts_language(language))
     return (
         "Add-Type -AssemblyName System.Speech; "
         "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-        "$voice = $s.GetInstalledVoices() | "
-        "Where-Object { $_.VoiceInfo.Culture.Name -like 'en-*' } | "
-        "Select-Object -First 1; "
+        "$voices = $s.GetInstalledVoices(); "
+        "$voice = $null; "
+        f"$preferredCulture = {preferred_culture}; "
+        "if ($preferredCulture) { "
+        "$voice = $voices | Where-Object { $_.VoiceInfo.Culture.Name -ieq $preferredCulture } | Select-Object -First 1; "
+        "if (-not $voice) { $voice = $voices | Where-Object { $_.VoiceInfo.Culture.Name -like \"$preferredCulture-*\" } | Select-Object -First 1 }; "
+        "} "
+        "if (-not $voice) { $voice = $voices | Where-Object { $_.VoiceInfo.Culture.Name -like 'en-*' } | Select-Object -First 1 }; "
         "if ($voice) { $s.SelectVoice($voice.VoiceInfo.Name) }; "
         f"$s.Rate = {rate}; "
         "$text = [Console]::In.ReadToEnd(); "
@@ -415,11 +469,11 @@ def tts_script(rate: int) -> str:
     )
 
 
-def speak_windows(text: str, rate: int) -> None:
+def speak_windows(text: str, rate: int, language: str | None = None) -> None:
     if not text:
         return
     subprocess.run(
-        ["powershell.exe", "-NoProfile", "-Command", tts_script(rate)],
+        ["powershell.exe", "-NoProfile", "-Command", tts_script(rate, language)],
         input=text,
         text=True,
         encoding="utf-8",
@@ -427,12 +481,12 @@ def speak_windows(text: str, rate: int) -> None:
     )
 
 
-def speak_windows_async(text: str, rate: int) -> subprocess.Popen[str] | None:
+def speak_windows_async(text: str, rate: int, language: str | None = None) -> subprocess.Popen[str] | None:
     if not text:
         return None
     try:
         process = subprocess.Popen(
-            ["powershell.exe", "-NoProfile", "-Command", tts_script(rate)],
+            ["powershell.exe", "-NoProfile", "-Command", tts_script(rate, language)],
             stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -455,7 +509,7 @@ async def main_async(args: argparse.Namespace) -> None:
     codex_cwd = Path(args.codex_cwd).resolve()
 
     while True:
-        prompt = await capture_one_turn(args)
+        prompt, prompt_language = await capture_one_turn(args)
         if not prompt:
             print("No prompt captured. Listening again.")
             continue
@@ -466,6 +520,8 @@ async def main_async(args: argparse.Namespace) -> None:
         prompt_path, answer_path, error_path = write_turn_files(out_dir, prompt)
         print("Prompt file:", prompt_path)
         print("Prompt:", prompt)
+        if prompt_language:
+            print("TTS language:", prompt_language)
 
         if not args.submit_codex:
             print("Preview mode. Add --submit-codex to send this to Codex CLI.")
@@ -499,7 +555,7 @@ async def main_async(args: argparse.Namespace) -> None:
                 if ack_process and ack_process.poll() is None:
                     with contextlib.suppress(subprocess.TimeoutExpired):
                         ack_process.wait(timeout=3)
-                speak_windows(answer, args.tts_rate)
+                speak_windows(answer, args.tts_rate, prompt_language)
 
 
 def parse_args() -> argparse.Namespace:

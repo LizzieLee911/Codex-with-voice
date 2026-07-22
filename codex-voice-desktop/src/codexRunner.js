@@ -3,9 +3,9 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 const CODEX_OUTPUT_INSTRUCTION = [
-  "Default to English for both interpreting the request and reporting back.",
+  "Use the same language as the user's request for both interpreting the request and reporting back.",
   "Do not output code, file paths, Markdown links, or logs.",
-  "Use plain English to briefly report progress and the result."
+  "Use plain language to briefly report progress and the result."
 ].join(" ");
 const SANDBOX_MODES = ["read-only", "workspace-write", "danger-full-access"];
 
