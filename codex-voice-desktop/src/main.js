@@ -6,6 +6,7 @@ const { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } = require(
 const { codexVersion, defaultPaths, runCommand } = require("./codexRunner");
 
 const paths = defaultPaths();
+const trayIconPath = path.join(__dirname, "..", "assets", "tray.png");
 let mainWindow = null;
 let tray = null;
 let voiceProcess = null;
@@ -51,17 +52,11 @@ function setState(patch) {
 }
 
 function createTrayIcon() {
-  const svg = encodeURIComponent(`
-    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32">
-      <rect width="32" height="32" rx="7" fill="#111"/>
-      <circle cx="16" cy="15" r="10" fill="#fff"/>
-      <circle cx="12.4" cy="12.7" r="1.6" fill="#111"/>
-      <circle cx="19.6" cy="12.7" r="1.6" fill="#111"/>
-      <path d="M11 17.3c1.2 2.1 3 3.1 5 3.1s3.8-1 5-3.1" fill="none" stroke="#111" stroke-width="2.2" stroke-linecap="round"/>
-      <path d="M21.2 22.4l5.2 3.1-2-6.1" fill="#fff"/>
-    </svg>
-  `);
-  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${svg}`);
+  const icon = nativeImage.createFromPath(trayIconPath);
+  if (icon.isEmpty()) {
+    console.warn(`Tray icon failed to load: ${trayIconPath}`);
+  }
+  return icon;
 }
 
 function showWindow() {
