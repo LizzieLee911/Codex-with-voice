@@ -156,15 +156,20 @@ async def capture_one_turn(args: argparse.Namespace) -> VoiceTurn:
     finalizing = False
     reported_language = ""
     turn_language = ""
+    last_rms = 0.0
+    audio_chunks = 0
+    last_status_at = time.monotonic()
 
     def enqueue_audio(data: bytes) -> None:
         with contextlib.suppress(asyncio.QueueFull):
             audio_queue.put_nowait(data)
 
     def audio_callback(indata, frames, callback_time, status):
-        nonlocal last_voice_at
+        nonlocal audio_chunks, last_rms, last_voice_at
         data = bytes(indata)
         rms = pcm_rms(data)
+        audio_chunks += 1
+        last_rms = rms
         if rms >= args.rms_threshold:
             last_voice_at = time.monotonic()
         loop.call_soon_threadsafe(enqueue_audio, data)
@@ -247,6 +252,12 @@ async def capture_one_turn(args: argparse.Namespace) -> VoiceTurn:
                                 print("Prompt:", prompt_candidate)
                         if active and detected_language:
                             turn_language = detected_language
+
+                if not active and args.listen_status_seconds > 0:
+                    now = time.monotonic()
+                    if now - last_status_at >= args.listen_status_seconds:
+                        last_status_at = now
+                        print(f"Listening status: audio chunks={audio_chunks}, last rms={last_rms:.1f}, waiting for wake word.")
 
                 if active:
                     prompt_ready = len(prompt_candidate) >= args.min_prompt_chars

@@ -123,6 +123,11 @@ function exists(file) {
   }
 }
 
+function wlkCwd() {
+  const sourceRoot = path.join(paths.voiceRoot, "WhisperLiveKit");
+  return exists(sourceRoot) ? sourceRoot : paths.voiceRoot;
+}
+
 function checkWlkHealth(timeoutMs = 2500) {
   return new Promise((resolve) => {
     const req = http.get("http://127.0.0.1:8000/health", { timeout: timeoutMs }, (res) => {
@@ -180,7 +185,7 @@ async function ensureWlk() {
     "--port", "8000",
     "--warmup-file="
   ], {
-    cwd: path.join(paths.voiceRoot, "WhisperLiveKit"),
+    cwd: wlkCwd(),
     windowsHide: true
   });
   wlkStartedByApp = true;
@@ -233,6 +238,7 @@ async function launchVoiceWorker() {
     "--codex-cwd", state.workspace,
     "--codex-sandbox", state.sandboxMode,
     "--codex-mode", state.codexMode,
+    "--codex-timeout-seconds", "300",
     "--submit-codex",
     "--speak",
     "--once"

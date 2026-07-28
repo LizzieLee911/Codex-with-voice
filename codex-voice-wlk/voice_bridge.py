@@ -64,6 +64,7 @@ async def main_async(args: argparse.Namespace) -> None:
             args.codex_sandbox,
             args.interactive_action,
             args.codex_session_id,
+            args.codex_timeout_seconds,
         )
         print(f"Submitting to Codex ({args.codex_mode})...")
         ack_process = speak_windows_async(args.ack_text, args.tts_rate) if args.speak else None
@@ -100,7 +101,21 @@ async def main_async(args: argparse.Namespace) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Voice and transcript bridge for WhisperLiveKit and Codex.")
     parser.add_argument("--ws-url", default=DEFAULT_WS_URL)
-    parser.add_argument("--wake-word", action="append", default=["codex", "code x", "code ex", "kodex"])
+    parser.add_argument(
+        "--wake-word",
+        action="append",
+        default=[
+            "codex",
+            "code x",
+            "code ex",
+            "co dex",
+            "codecks",
+            "kodex",
+            "\u79d1\u5fb7\u514b\u65af",
+            "\u67ef\u5fb7\u514b\u65af",
+            "\u6263\u5f97\u514b\u65af",
+        ],
+    )
     parser.add_argument("--silence-seconds", type=float, default=2.5)
     parser.add_argument("--rms-threshold", type=float, default=350.0)
     parser.add_argument("--post-wake-grace-seconds", type=float, default=1.2)
@@ -123,6 +138,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-bin")
     parser.add_argument("--codex-mode", choices=CODEX_MODES, default="one-time")
     parser.add_argument("--interactive-action", choices=INTERACTIVE_ACTIONS, default="fork")
+    parser.add_argument("--codex-timeout-seconds", type=float, default=300.0)
     parser.add_argument("--codex-new-session", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--codex-fallback-new-session", action=argparse.BooleanOptionalAction, default=True, help=argparse.SUPPRESS)
     parser.add_argument("--codex-sandbox", choices=CODEX_SANDBOX_MODES, default="danger-full-access")
@@ -130,6 +146,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--speak", action="store_true")
     parser.add_argument("--ack-text", default=ACK_TEXT)
     parser.add_argument("--tts-rate", type=int, default=0)
+    parser.add_argument("--listen-status-seconds", type=float, default=15.0)
     parser.add_argument("--debug-transcript", action="store_true")
     return parser.parse_args()
 

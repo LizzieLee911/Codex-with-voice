@@ -51,7 +51,7 @@ def resolve_codex_bin(codex_bin: str | None) -> str:
     return shutil.which("codex.cmd") or shutil.which("codex") or "codex"
 
 
-def run_codex_command(cmd: list[str], prompt: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+def run_codex_command(cmd: list[str], prompt: str, cwd: Path, timeout_seconds: float) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         cmd,
         input=prompt,
@@ -60,6 +60,7 @@ def run_codex_command(cmd: list[str], prompt: str, cwd: Path) -> subprocess.Comp
         encoding="utf-8",
         errors="replace",
         capture_output=True,
+        timeout=timeout_seconds,
     )
 
 
@@ -90,13 +91,32 @@ def build_interactive_cmd(
 
 
 class OneTimeBackend:
-    def __init__(self, codex_bin: str | None, sandbox_mode: str) -> None:
+    def __init__(self, codex_bin: str | None, sandbox_mode: str, timeout_seconds: float) -> None:
         self.codex_bin = resolve_codex_bin(codex_bin)
         self.sandbox_mode = sandbox_mode
+        self.timeout_seconds = timeout_seconds
 
     def submit(self, turn: VoiceTurn, files: TurnFiles, cwd: Path) -> CodexResult:
         cmd = build_one_time_cmd(self.codex_bin, files.answer_path, self.sandbox_mode)
-        result = run_codex_command(cmd, build_codex_prompt(turn.text), cwd)
+        try:
+            result = run_codex_command(cmd, build_codex_prompt(turn.text), cwd, self.timeout_seconds)
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout or ""
+            stderr = exc.stderr or ""
+            error_text = (
+                f"[one-time] codex timed out after {self.timeout_seconds:.0f}s\n"
+                f"command: {format_command(cmd)}\n\n"
+                f"stdout:\n{stdout}\n\nstderr:\n{stderr}"
+            )
+            files.error_path.write_text(error_text, encoding="utf-8")
+            return CodexResult(
+                mode="one-time",
+                ok=False,
+                command=cmd,
+                answer_path=files.answer_path,
+                error_path=files.error_path,
+                status_text=f"codex timed out after {self.timeout_seconds:.0f} seconds",
+            )
         if result.returncode != 0:
             error_text = (
                 f"[one-time] codex exited with status {result.returncode}\n"
@@ -194,7 +214,8 @@ def create_backend(
     sandbox_mode: str,
     interactive_action: str,
     session_id: str | None,
+    timeout_seconds: float,
 ) -> OneTimeBackend | InteractiveBackend:
     if mode == "interactive":
         return InteractiveBackend(codex_bin, sandbox_mode, interactive_action, session_id)
-    return OneTimeBackend(codex_bin, sandbox_mode)
+    return OneTimeBackend(codex_bin, sandbox_mode, timeout_seconds)
