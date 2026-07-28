@@ -239,6 +239,7 @@ async function launchVoiceWorker() {
     "--codex-sandbox", state.sandboxMode,
     "--codex-mode", state.codexMode,
     "--codex-timeout-seconds", "300",
+    "--input-gain", "4.0",
     "--submit-codex",
     "--speak",
     "--once"

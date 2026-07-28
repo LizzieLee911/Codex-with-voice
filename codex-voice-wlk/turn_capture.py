@@ -133,6 +133,14 @@ def pcm16_to_float32(data: bytes) -> np.ndarray:
     return np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0
 
 
+def apply_input_gain(data: bytes, gain: float) -> bytes:
+    if not data or gain == 1.0:
+        return data
+    samples = np.frombuffer(data, dtype="<i2").astype(np.float32)
+    samples = np.clip(samples * max(gain, 0.0), -32768, 32767).astype("<i2")
+    return samples.tobytes()
+
+
 async def capture_one_turn(args: argparse.Namespace) -> VoiceTurn:
     wake_re = compile_wake_regex(args.wake_word)
     audio_queue: asyncio.Queue[bytes] = asyncio.Queue(maxsize=20)
@@ -166,7 +174,7 @@ async def capture_one_turn(args: argparse.Namespace) -> VoiceTurn:
 
     def audio_callback(indata, frames, callback_time, status):
         nonlocal audio_chunks, last_rms, last_voice_at
-        data = bytes(indata)
+        data = apply_input_gain(bytes(indata), args.input_gain)
         rms = pcm_rms(data)
         audio_chunks += 1
         last_rms = rms
@@ -184,6 +192,8 @@ async def capture_one_turn(args: argparse.Namespace) -> VoiceTurn:
         )
         stream.start()
         print("Listening. Say one of:", ", ".join(args.wake_word))
+        if args.input_gain != 1.0:
+            print(f"Input gain: {args.input_gain:g}x")
 
         async def sender():
             nonlocal human_speech_active, last_human_speech_at, last_voice_at

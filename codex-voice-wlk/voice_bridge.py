@@ -101,23 +101,10 @@ async def main_async(args: argparse.Namespace) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Voice and transcript bridge for WhisperLiveKit and Codex.")
     parser.add_argument("--ws-url", default=DEFAULT_WS_URL)
-    parser.add_argument(
-        "--wake-word",
-        action="append",
-        default=[
-            "codex",
-            "code x",
-            "code ex",
-            "co dex",
-            "codecks",
-            "kodex",
-            "\u79d1\u5fb7\u514b\u65af",
-            "\u67ef\u5fb7\u514b\u65af",
-            "\u6263\u5f97\u514b\u65af",
-        ],
-    )
+    parser.add_argument("--wake-word", action="append", default=["codex", "code x", "code ex", "kodex"])
     parser.add_argument("--silence-seconds", type=float, default=2.5)
     parser.add_argument("--rms-threshold", type=float, default=350.0)
+    parser.add_argument("--input-gain", type=float, default=1.0)
     parser.add_argument("--post-wake-grace-seconds", type=float, default=1.2)
     parser.add_argument("--text-settle-seconds", type=float, default=0.6)
     parser.add_argument("--human-silence-seconds", type=float, default=2.5)
