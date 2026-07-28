@@ -6,6 +6,11 @@ const sandboxModes = [
   { value: "danger-full-access", label: "Full access" }
 ];
 
+const codexModes = [
+  { value: "one-time", label: "One-time mode" },
+  { value: "interactive", label: "Interactive mode" }
+];
+
 const els = {
   status: $("status"),
   language: $("language"),
@@ -13,8 +18,8 @@ const els = {
   codex: $("codex"),
   sandbox: $("sandbox"),
   sandboxLabel: $("sandboxLabel"),
-  newSession: $("newSession"),
-  sessionLabel: $("sessionLabel"),
+  codexMode: $("codexMode"),
+  codexModeLabel: $("codexModeLabel"),
   log: $("log"),
   start: $("start"),
   stop: $("stop")
@@ -29,9 +34,14 @@ function currentSandboxMode() {
   return sandboxModes[Number(els.sandbox.value)]?.value || "danger-full-access";
 }
 
+function currentCodexMode() {
+  return codexModes[Number(els.codexMode.value)]?.value || "one-time";
+}
+
 function renderState(state) {
   const mode = state.mode || "stopped";
   const sandboxIndex = Math.max(0, sandboxModes.findIndex((item) => item.value === state.sandboxMode));
+  const codexModeIndex = Math.max(0, codexModes.findIndex((item) => item.value === state.codexMode));
 
   els.status.textContent = state.status || "Unknown";
   els.status.dataset.mode = mode;
@@ -39,12 +49,12 @@ function renderState(state) {
   els.wlk.textContent = state.wlk || "unknown";
   els.sandbox.value = String(sandboxIndex);
   els.sandboxLabel.textContent = sandboxModes[sandboxIndex].label;
-  els.newSession.checked = Boolean(state.newSession);
-  els.sessionLabel.textContent = state.newSession ? "New session for each request" : "Resume last session";
+  els.codexMode.value = String(codexModeIndex);
+  els.codexModeLabel.textContent = codexModes[codexModeIndex].label;
   els.start.disabled = mode !== "stopped";
   els.stop.disabled = mode === "stopped";
   els.sandbox.disabled = mode !== "stopped";
-  els.newSession.disabled = mode !== "stopped";
+  els.codexMode.disabled = mode !== "stopped";
 }
 
 async function refreshEnv() {
@@ -70,10 +80,10 @@ els.sandbox.addEventListener("input", () => {
   els.sandboxLabel.textContent = sandboxModes[Number(els.sandbox.value)].label;
   runAction(`Sandbox: ${mode}`, () => window.voiceApp.setSandbox(mode));
 });
-els.newSession.addEventListener("change", () => {
-  const enabled = els.newSession.checked;
-  els.sessionLabel.textContent = enabled ? "New session for each request" : "Resume last session";
-  runAction(`Session mode: ${enabled ? "new" : "resume last"}`, () => window.voiceApp.setNewSession(enabled));
+els.codexMode.addEventListener("input", () => {
+  const mode = currentCodexMode();
+  els.codexModeLabel.textContent = codexModes[Number(els.codexMode.value)].label;
+  runAction(`Codex mode: ${mode}`, () => window.voiceApp.setCodexMode(mode));
 });
 
 window.voiceApp.onLog(appendLog);

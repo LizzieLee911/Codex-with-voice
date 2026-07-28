@@ -23,7 +23,7 @@ let state = {
   voiceRoot: paths.voiceRoot,
   detectedLanguage: "Waiting",
   sandboxMode: "danger-full-access",
-  newSession: false
+  codexMode: "one-time"
 };
 
 function send(channel, payload) {
@@ -231,14 +231,12 @@ async function startVoice() {
     "voice_bridge.py",
     "--codex-cwd", state.workspace,
     "--codex-sandbox", state.sandboxMode,
+    "--codex-mode", state.codexMode,
     "--submit-codex",
     "--speak"
   ];
-  if (state.newSession) {
-    args.push("--codex-new-session");
-  }
 
-  log(`Starting listener with sandbox: ${state.sandboxMode}; session: ${state.newSession ? "new" : "resume last"}`);
+  log(`Starting listener with sandbox: ${state.sandboxMode}; mode: ${state.codexMode}`);
   voiceProcess = spawn(paths.pythonBin, args, {
     cwd: paths.voiceRoot,
     windowsHide: true
@@ -309,8 +307,12 @@ ipcMain.handle("set-sandbox", (_event, sandboxMode) => {
   setState({ sandboxMode });
   return state;
 });
-ipcMain.handle("set-new-session", (_event, newSession) => {
-  setState({ newSession: Boolean(newSession) });
+ipcMain.handle("set-codex-mode", (_event, codexMode) => {
+  const allowed = ["one-time", "interactive"];
+  if (!allowed.includes(codexMode)) {
+    throw new Error(`Unsupported Codex mode: ${codexMode}`);
+  }
+  setState({ codexMode });
   return state;
 });
 

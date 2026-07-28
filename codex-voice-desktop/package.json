@@ -7,6 +7,7 @@
   "scripts": {
     "start": "electron .",
     "smoke": "node scripts/smoke-test.js",
+    "smoke:bridge": "python ../codex-voice-wlk/scripts/smoke_bridge.py",
     "smoke:real": "node scripts/smoke-test.js --real-codex"
   },
   "devDependencies": {

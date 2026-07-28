@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <h1>Codex Voice</h1>
-          <p>Say “codex” to send a request.</p>
+          <p>Say "codex" to send a request.</p>
         </div>
         <span id="status" data-mode="stopped">Stopped</span>
       </header>
@@ -43,10 +43,10 @@
           <strong id="sandboxLabel">Full access</strong>
         </label>
 
-        <label class="sessionControl">
-          <input id="newSession" type="checkbox">
-          <span>New session</span>
-          <strong id="sessionLabel">Resume last session</strong>
+        <label class="modeControl">
+          <span>Codex mode</span>
+          <input id="codexMode" type="range" min="0" max="1" step="1" value="0">
+          <strong id="codexModeLabel">One-time mode</strong>
         </label>
       </section>
 
