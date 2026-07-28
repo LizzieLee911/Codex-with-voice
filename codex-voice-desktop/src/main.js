@@ -12,6 +12,7 @@ let tray = null;
 let voiceProcess = null;
 let wlkProcess = null;
 let wlkStartedByApp = false;
+let listenerWanted = false;
 let isQuitting = false;
 let quitAfterCleanup = false;
 let state = {
@@ -80,8 +81,8 @@ function updateTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Show", click: showWindow },
     { type: "separator" },
-    { label: "Start", enabled: !voiceProcess, click: () => startVoice() },
-    { label: "Stop", enabled: Boolean(voiceProcess), click: () => stopVoice() },
+    { label: "Start", enabled: !listenerWanted, click: () => startVoice() },
+    { label: "Stop", enabled: listenerWanted, click: () => stopVoice() },
     { type: "separator" },
     { label: "Quit", click: quitApp }
   ]));
@@ -214,9 +215,8 @@ function killProcessTree(child) {
   return Promise.resolve();
 }
 
-async function startVoice() {
+async function launchVoiceWorker() {
   if (voiceProcess) {
-    log("Voice listener is already running.");
     return state;
   }
   if (!exists(paths.pythonBin)) {
@@ -228,15 +228,17 @@ async function startVoice() {
 
   await ensureWlk();
   const args = [
+    "-u",
     "voice_bridge.py",
     "--codex-cwd", state.workspace,
     "--codex-sandbox", state.sandboxMode,
     "--codex-mode", state.codexMode,
     "--submit-codex",
-    "--speak"
+    "--speak",
+    "--once"
   ];
 
-  log(`Starting listener with sandbox: ${state.sandboxMode}; mode: ${state.codexMode}`);
+  log(`Starting listener turn with sandbox: ${state.sandboxMode}; mode: ${state.codexMode}`);
   voiceProcess = spawn(paths.pythonBin, args, {
     cwd: paths.voiceRoot,
     windowsHide: true
@@ -249,14 +251,37 @@ async function startVoice() {
   });
   wireProcessLogs(voiceProcess, "voice");
   voiceProcess.on("close", (code) => {
-    log(`voice process exited with code ${code}`);
+    log(`voice turn exited with code ${code}`);
     voiceProcess = null;
-    setState({ mode: "stopped", status: "Stopped", voicePid: null });
+    if (!listenerWanted || isQuitting || quitAfterCleanup) {
+      setState({ mode: "stopped", status: "Stopped", voicePid: null });
+      return;
+    }
+    setState({ mode: "codex", status: "Restarting", voicePid: null, detectedLanguage: "Waiting" });
+    setTimeout(() => {
+      if (!listenerWanted || voiceProcess) return;
+      launchVoiceWorker().catch((error) => {
+        log(`ERROR: ${error.message || error}`);
+        listenerWanted = false;
+        setState({ mode: "stopped", status: "Stopped", voicePid: null });
+      });
+    }, 750);
   });
   return state;
 }
 
+async function startVoice() {
+  if (listenerWanted) {
+    log("Voice listener is already running.");
+    return state;
+  }
+  listenerWanted = true;
+  updateTray();
+  return launchVoiceWorker();
+}
+
 async function stopVoice() {
+  listenerWanted = false;
   if (voiceProcess) {
     log("Stopping voice listener...");
     await killProcessTree(voiceProcess);
