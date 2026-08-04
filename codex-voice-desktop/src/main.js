@@ -7,10 +7,13 @@ const { codexVersion, defaultPaths, runCommand } = require("./codexRunner");
 
 const paths = defaultPaths();
 const trayIconPath = path.join(__dirname, "..", "assets", "tray.png");
+const appIconPath = path.join(__dirname, "..", "assets", "app-icon.ico");
 let mainWindow = null;
+let bubbleWindow = null;
 let tray = null;
 let voiceProcess = null;
 let wlkProcess = null;
+let trackerProcess = null;
 let wlkStartedByApp = false;
 let listenerWanted = false;
 let isQuitting = false;
@@ -30,6 +33,9 @@ let state = {
 function send(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
+  }
+  if (bubbleWindow && !bubbleWindow.isDestroyed()) {
+    bubbleWindow.webContents.send(channel, payload);
   }
 }
 
@@ -52,10 +58,10 @@ function setState(patch) {
   updateTray();
 }
 
-function createTrayIcon() {
-  const icon = nativeImage.createFromPath(trayIconPath);
+function createIcon(iconPath) {
+  const icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) {
-    console.warn(`Tray icon failed to load: ${trayIconPath}`);
+    console.warn(`Icon failed to load: ${iconPath}`);
   }
   return icon;
 }
@@ -67,11 +73,17 @@ function showWindow() {
   mainWindow.focus();
 }
 
+function showBubble() {
+  if (!bubbleWindow || bubbleWindow.isDestroyed() || bubbleWindow.isVisible()) return;
+  bubbleWindow.showInactive();
+}
+
 async function quitApp() {
   if (quitAfterCleanup) return;
   quitAfterCleanup = true;
   isQuitting = true;
   await stopVoice();
+  await stopWindowTracker();
   app.quit();
 }
 
@@ -95,7 +107,7 @@ function createWindow() {
     minWidth: 620,
     minHeight: 520,
     backgroundColor: "#f6f6f6",
-    icon: createTrayIcon(),
+    icon: createIcon(appIconPath),
     title: "Codex Voice Companion",
     webPreferences: {
       preload: path.join(__dirname, "preload.js")
@@ -113,6 +125,17 @@ function createWindow() {
     mainWindow.hide();
     log("Window hidden to tray. Use tray Quit to exit.");
   });
+}
+
+function bubbleContextMenu() {
+  Menu.buildFromTemplate([
+    { label: "Show Panel", click: showWindow },
+    { type: "separator" },
+    { label: "Start Listening", enabled: !listenerWanted, click: () => startVoice() },
+    { label: "Stop Listening", enabled: listenerWanted, click: () => stopVoice() },
+    { type: "separator" },
+    { label: "Quit", click: quitApp }
+  ]).popup({ window: bubbleWindow });
 }
 
 function exists(file) {
@@ -146,6 +169,38 @@ function checkWlkHealth(timeoutMs = 2500) {
     req.on("error", (error) => {
       resolve({ ok: false, error: error.message });
     });
+  });
+}
+
+function createBubbleWindow() {
+  bubbleWindow = new BrowserWindow({
+    width: 56,
+    height: 56,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    icon: createIcon(appIconPath),
+    title: "Codex Voice Bubble",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js")
+    }
+  });
+  bubbleWindow.setAlwaysOnTop(true, "pop-up-menu");
+  bubbleWindow.loadFile(path.join(__dirname, "bubble.html"));
+  bubbleWindow.webContents.once("did-finish-load", () => {
+    bubbleWindow.webContents.send("state", state);
+  });
+  bubbleWindow.on("closed", () => {
+    bubbleWindow = null;
   });
 }
 
@@ -218,6 +273,87 @@ function killProcessTree(child) {
   }
   child.kill("SIGTERM");
   return Promise.resolve();
+}
+
+function trackerScriptPath() {
+  const devPath = path.join(__dirname, "window_tracker.py");
+  const unpackedPath = path.join(process.resourcesPath || "", "app.asar.unpacked", "src", "window_tracker.py");
+  if (devPath.includes(".asar")) return unpackedPath;
+  return exists(devPath) ? devPath : unpackedPath;
+}
+
+function trackerPythonBin() {
+  if (exists(paths.pythonBin)) return paths.pythonBin;
+  return process.platform === "win32" ? "python.exe" : "python3";
+}
+
+function placeBubble(target) {
+  if (!bubbleWindow || bubbleWindow.isDestroyed()) return;
+  if (!target || !target.found || target.minimized || target.width < 240 || target.height < 180) {
+    bubbleWindow.hide();
+    return;
+  }
+
+  const size = 56;
+  const margin = 18;
+  const topOffset = 82;
+  const x = Math.max(target.left + margin, target.right - size - margin);
+  let y = target.top + topOffset;
+  const maxY = target.bottom - size - margin;
+  if (y > maxY) y = target.top + margin;
+
+  bubbleWindow.setBounds({
+    x: Math.round(x),
+    y: Math.round(y),
+    width: size,
+    height: size
+  }, false);
+  showBubble();
+}
+
+function startWindowTracker() {
+  if (process.platform !== "win32" || trackerProcess) return;
+  const script = trackerScriptPath();
+  if (!exists(script)) {
+    log(`Bubble tracker not found: ${script}`);
+    return;
+  }
+
+  trackerProcess = spawn(trackerPythonBin(), ["-u", script], {
+    cwd: paths.appRoot,
+    windowsHide: true
+  });
+  trackerProcess.stdout?.on("data", (chunk) => {
+    for (const line of chunk.toString("utf8").split(/\r?\n/).filter(Boolean)) {
+      try {
+        placeBubble(JSON.parse(line));
+      } catch (error) {
+        log(`Bubble tracker parse error: ${error.message || error}`);
+      }
+    }
+  });
+  trackerProcess.stderr?.on("data", (chunk) => {
+    for (const line of chunk.toString("utf8").split(/\r?\n/).filter(Boolean)) {
+      log(`bubble-tracker: ${line}`);
+    }
+  });
+  trackerProcess.on("error", (error) => {
+    log(`Bubble tracker failed: ${error.message || error}`);
+    trackerProcess = null;
+  });
+  trackerProcess.on("close", (code) => {
+    if (!isQuitting && !quitAfterCleanup && code !== 0) {
+      log(`Bubble tracker exited with code ${code}`);
+    }
+    trackerProcess = null;
+    if (bubbleWindow && !bubbleWindow.isDestroyed()) bubbleWindow.hide();
+  });
+}
+
+async function stopWindowTracker() {
+  if (!trackerProcess) return;
+  await killProcessTree(trackerProcess);
+  trackerProcess = null;
 }
 
 async function launchVoiceWorker() {
@@ -304,6 +440,10 @@ async function stopVoice() {
   return state;
 }
 
+async function toggleVoice() {
+  return listenerWanted ? stopVoice() : startVoice();
+}
+
 async function getEnvironment() {
   const version = await codexVersion();
   const health = await checkWlkHealth();
@@ -325,6 +465,15 @@ async function getEnvironment() {
 ipcMain.handle("env", getEnvironment);
 ipcMain.handle("start", () => startVoice());
 ipcMain.handle("stop", stopVoice);
+ipcMain.handle("toggle", toggleVoice);
+ipcMain.handle("show-main", () => {
+  showWindow();
+  return state;
+});
+ipcMain.handle("bubble-menu", () => {
+  bubbleContextMenu();
+  return state;
+});
 ipcMain.handle("open-turns", () => shell.openPath(path.join(paths.voiceRoot, ".voice", "turns")));
 ipcMain.handle("set-workspace", (_event, workspace) => {
   const resolved = path.resolve(workspace || paths.workspaceRoot);
@@ -350,9 +499,11 @@ ipcMain.handle("set-codex-mode", (_event, codexMode) => {
 
 app.whenReady().then(() => {
   createWindow();
-  tray = new Tray(createTrayIcon());
+  createBubbleWindow();
+  tray = new Tray(createIcon(trayIconPath));
   tray.on("click", showWindow);
   updateTray();
+  startWindowTracker();
 });
 
 app.on("before-quit", (event) => {

@@ -126,8 +126,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--codex-mode", choices=CODEX_MODES, default="one-time")
     parser.add_argument("--interactive-action", choices=INTERACTIVE_ACTIONS, default="fork")
     parser.add_argument("--codex-timeout-seconds", type=float, default=300.0)
-    parser.add_argument("--codex-new-session", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--codex-fallback-new-session", action=argparse.BooleanOptionalAction, default=True, help=argparse.SUPPRESS)
     parser.add_argument("--codex-sandbox", choices=CODEX_SANDBOX_MODES, default="danger-full-access")
     parser.add_argument("--submit-codex", action="store_true")
     parser.add_argument("--speak", action="store_true")

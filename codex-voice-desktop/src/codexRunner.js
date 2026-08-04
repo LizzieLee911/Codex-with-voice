@@ -165,8 +165,9 @@ async function submitTranscript(options) {
 
 function defaultPaths() {
   const appRoot = path.resolve(__dirname, "..");
-  const workspaceRoot = path.resolve(appRoot, "..");
-  const voiceRoot = process.env.CODEX_VOICE_ROOT || path.join(workspaceRoot, "codex-voice-wlk");
+  const devWorkspaceRoot = path.resolve(appRoot, "..");
+  const voiceRoot = resolveVoiceRoot(appRoot, devWorkspaceRoot);
+  const workspaceRoot = path.resolve(voiceRoot, "..");
   return {
     appRoot,
     workspaceRoot,
@@ -178,6 +179,36 @@ function defaultPaths() {
       ? path.join(voiceRoot, ".venv", "Scripts", "wlk.exe")
       : path.join(voiceRoot, ".venv", "bin", "wlk")
   };
+}
+
+function resolveVoiceRoot(appRoot, devWorkspaceRoot) {
+  if (process.env.CODEX_VOICE_ROOT) {
+    return path.resolve(process.env.CODEX_VOICE_ROOT);
+  }
+
+  const exeDir = path.dirname(process.execPath || "");
+  const cwd = process.cwd();
+  const resourcesPath = process.resourcesPath || "";
+  const candidates = [
+    path.join(devWorkspaceRoot, "codex-voice-wlk"),
+    path.join(resourcesPath, "codex-voice-wlk"),
+    path.join(cwd, "codex-voice-wlk"),
+    path.join(cwd, "..", "codex-voice-wlk"),
+    path.join(cwd, "..", "..", "codex-voice-wlk"),
+    path.join(cwd, "..", "..", "..", "codex-voice-wlk"),
+    path.join(exeDir, "codex-voice-wlk"),
+    path.join(exeDir, "..", "codex-voice-wlk"),
+    path.join(exeDir, "..", "..", "codex-voice-wlk"),
+    path.join(exeDir, "..", "..", "..", "codex-voice-wlk")
+  ];
+
+  for (const candidate of candidates) {
+    if (fileExists(path.join(candidate, "voice_bridge.py"))) {
+      return path.resolve(candidate);
+    }
+  }
+
+  return path.join(devWorkspaceRoot, "codex-voice-wlk");
 }
 
 module.exports = {

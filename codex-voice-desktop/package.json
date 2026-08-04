@@ -6,11 +6,41 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "dist:portable": "electron-builder --win portable",
+    "shortcut": "node scripts/create-desktop-shortcut.js",
     "smoke": "node scripts/smoke-test.js",
     "smoke:bridge": "python ../codex-voice-wlk/scripts/smoke_bridge.py",
     "smoke:real": "node scripts/smoke-test.js --real-codex"
   },
+  "build": {
+    "appId": "com.codex.voice-companion",
+    "productName": "Codex Voice Companion",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "src/window_tracker.py"
+    ],
+    "win": {
+      "icon": "assets/app-icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Codex Voice Companion.exe"
+    }
+  },
   "devDependencies": {
-    "electron": "^39.2.7"
+    "electron": "^39.2.7",
+    "electron-builder": "^26.15.3"
   }
 }
